@@ -1,6 +1,7 @@
 import Control.Monad.IO.Class
 import Data.List
 import System.Random
+import Text.Printf
 import UI.NCurses
 
 data Tile = Blank | Number Int deriving (Eq, Show)
@@ -11,33 +12,24 @@ showBoard :: Board -> String
 showBoard rows = unlines $ interpose hline (map showRow rows)
   where
     n = length (head rows)
-    hline = intervene "+" (replicate n "----")
+    hline = intervene "+" (replicate n "------")
 
 showRow :: [Tile] -> String
 showRow tiles =
-  intervene "|" (replicate n "    ") ++ "\n" ++
-  intervene "|" (map showTile tiles) ++ "\n" ++
-  intervene "|" (replicate n "    ")
+  intervene "|" (replicate n "      ") ++ "\n" ++
+  intervene "|" (map showTile tiles)   ++ "\n" ++
+  intervene "|" (replicate n "      ")
   where
     n = length tiles
 
-    showTile Blank = "    "
-    showTile (Number k) = pad 4 (show k)
+    showTile Blank = "      "
+    showTile (Number k) = printf " %4d " k
 
 interpose :: a -> [a] -> [a]
 interpose sep xs = [sep] ++ intersperse sep xs ++ [sep]
 
 intervene :: [a] -> [[a]] -> [a]
 intervene sep = concat . interpose sep
-
-pad :: Int -> String -> String
-pad padding string =
-  if n < padding then
-    replicate (padding - n) ' ' ++ string
-  else
-    string
-  where
-    n = length string
 
 slideLeft :: Board -> Board
 slideLeft rows = map slideRowLeft rows
