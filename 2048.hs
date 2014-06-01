@@ -1,6 +1,7 @@
+import Control.Monad.IO.Class
 import Data.List
-import System.IO
 import System.Random
+import UI.NCurses
 
 data Tile = Blank | Number Int deriving (Eq, Show)
 
@@ -98,41 +99,64 @@ emptyBoard = replicate 4 (replicate 4 Blank)
 initialBoard :: IO Board
 initialBoard = addRandomTile =<< addRandomTile emptyBoard
 
-displayBoard :: Board -> IO ()
-displayBoard board = do
-  cls
-  writeAt (0, 0) (showBoard board)
-
-cls :: IO ()
-cls = putStr "\ESC[2J"
-
-writeAt :: (Int, Int) -> String -> IO ()
-writeAt p xs = do
-  goto p
-  putStr xs
-
-goto :: (Int, Int) -> IO ()
-goto (x, y) = putStr ("\ESC[" ++ show y ++ ";" ++ show x ++ "H")
-
 main :: IO ()
-main = do
-  hSetBuffering stdin NoBuffering
-  hSetEcho stdin False
-  loop =<< initialBoard
+main = runCurses $ do
+  setEcho False
+  play =<< defaultWindow
 
-loop :: Board -> IO ()
-loop board = do
+play :: Window -> Curses ()
+play window = loop window =<< liftIO initialBoard
+
+loop :: Window -> Board -> Curses ()
+loop window board = do
   displayBoard board
   case () of
-    _ | isComplete board -> putStrLn "You win!"
-      | isStuck board -> putStrLn "Game over!"
-      | otherwise -> loop =<< step board
+    _ | isComplete board ->
+          endGameOrReplay "You win! Try again (y/n)? "
+      | isStuck board ->
+          endGameOrReplay "Game over! Try again (y/n)? "
+      | otherwise ->
+          loop window =<< step board
+  where
+    displayBoard board = do
+      updateWindow window $ do
+        moveCursor 0 0
+        drawString $ showBoard board
+      render
 
-step :: Board -> IO Board
-step board = do
-  key <- getChar
-  let board' = slide key board
-  if board' == board then step board else addRandomTile board'
+    endGameOrReplay status = do
+      displayStatus status
+      tryAgain <- getResponse
+      if tryAgain
+        then clearStatus status >> play window
+        else return ()
+
+    displayStatus status = do
+      updateWindow window $ do
+        moveCursor 17 0
+        drawString status
+      render
+
+    getResponse = do
+      event <- getEvent window Nothing
+      case event of
+        Just (EventCharacter 'y') -> return True
+        Just (EventCharacter 'n') -> return False
+        _ -> getResponse
+
+    clearStatus status = do
+      updateWindow window $ do
+        moveCursor 17 0
+        drawString $ replicate (length status) ' '
+        moveCursor 17 0
+      render
+
+    step board = do
+      event <- getEvent window Nothing
+      let board' = slide event board
+      if board' == board
+        then step board
+        else liftIO $ addRandomTile board'
 
 isComplete :: Board -> Bool
 isComplete = any (any (== Number 2048))
@@ -146,10 +170,10 @@ isStuck board =
     , slideRight
     ]
 
-slide :: Char -> Board -> Board
-slide key = case key of
-  'w' -> slideUp
-  's' -> slideDown
-  'a' -> slideLeft
-  'd' -> slideRight
-  _   -> id
+slide :: Maybe Event -> Board -> Board
+slide event = case event of
+  Just (EventSpecialKey KeyUpArrow) -> slideUp
+  Just (EventSpecialKey KeyDownArrow) -> slideDown
+  Just (EventSpecialKey KeyLeftArrow) -> slideLeft
+  Just (EventSpecialKey KeyRightArrow) -> slideRight
+  _ -> id
