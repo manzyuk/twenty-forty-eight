@@ -1,0 +1,10 @@
+name:                twenty-forty-eight
+version:             0.0.1
+cabal-version:       >= 1.2
+description:         Console clone of the 2048 game (http://gabrielecirulli.github.io/2048/)
+author:              Oleksandr Manzyuk
+build-type:          Simple
+
+executable twenty-forty-eight
+  main-is:           twenty-forty-eight.hs
+  build-depends:     base >= 3 && < 5, ncurses, random, transformers
